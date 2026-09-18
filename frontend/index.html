@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kuroshi — Streaming de Anime</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@500;600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#ffffff;
+    --bg-1:#f5f4f1;
+    --bg-2:#ececE8;
+    --panel:#0d0d0d;
+    --line:#e3e1db;
+    --line-strong:#111111;
+    --ink:#111111;
+    --ink-dim:#68655f;
+    --ink-faint:#a5a29a;
+    --accent:#c8102e;
+    --accent-ink:#ffffff;
+    --radius:2px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg-0);
+    color:var(--ink);
+    font-family:'Manrope',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  h1,h2,h3,.display{
+    font-family:'Archivo Black','Archivo',system-ui,sans-serif;
+    font-weight:400;
+    letter-spacing:-0.01em;
+    margin:0;
+  }
+  a{color:inherit;text-decoration:none;}
+  button{font-family:inherit;cursor:pointer;}
+  ::selection{background:var(--accent);color:#fff;}
+  ::-webkit-scrollbar{height:8px;width:8px;}
+  ::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent);outline-offset:2px;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
+  }
+
+  #app{min-height:100vh;display:flex;flex-direction:column;}
+
+  header.topbar{
+    position:sticky;top:0;z-index:50;background:rgba(255,255,255,.9);backdrop-filter:blur(6px);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:22px clamp(20px,4vw,56px);border-bottom:1px solid var(--line);gap:24px;
+  }
+  .brand{display:flex;flex-direction:column;line-height:1;gap:4px;}
+  .brand b{font-family:'Archivo Black';font-size:19px;letter-spacing:.01em;}
+  .brand small{font-size:9px;letter-spacing:.22em;color:var(--accent);font-weight:700;}
+  nav.mainnav{display:flex;gap:34px;}
+  nav.mainnav a{
+    font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);
+    padding:4px 0;border-bottom:1px solid transparent;
+  }
+  nav.mainnav a:hover{color:var(--ink);}
+  nav.mainnav a.active{color:var(--ink);border-color:var(--ink);}
+  .topbar-actions{display:flex;align-items:center;gap:14px;}
+  .search-wrap{position:relative;}
+  .search-wrap input{
+    background:var(--bg-1);border:1px solid var(--line);color:var(--ink);
+    padding:8px 12px 8px 32px;border-radius:2px;font-size:12px;width:150px;
+    transition:width .2s ease,border-color .2s ease;
+  }
+  .search-wrap input:focus{width:210px;border-color:var(--ink);}
+  .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.5;}
+  .icon-sq{
+    width:38px;height:38px;border:1px solid var(--line-strong);background:var(--ink);color:#fff;
+    display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+  }
+  .icon-sq:hover{background:var(--accent);border-color:var(--accent);}
+  .avatar{
+    width:34px;height:34px;border-radius:50%;background:var(--ink);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;
+  }
+
+  main{flex:1;}
+
+  footer.sitefoot{
+    border-top:1px solid var(--line);padding:30px clamp(20px,4vw,56px);
+    color:var(--ink-faint);font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  }
+
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border:none;font-weight:800;font-size:12px;letter-spacing:.04em;text-transform:uppercase;transition:transform .12s ease, background .15s ease, color .15s ease;border-radius:1px;}
+  .btn:active{transform:scale(.97);}
+  .btn-solid{background:var(--ink);color:#fff;}
+  .btn-solid:hover{background:var(--accent);}
+  .btn-outline{background:#fff;border:1.5px solid var(--ink);color:var(--ink);}
+  .btn-outline:hover{border-color:var(--accent);color:var(--accent);}
+  .btn-sm{padding:8px 15px;font-size:11px;}
+  .icon-round{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--ink);display:flex;align-items:center;justify-content:center;background:#fff;flex:0 0 auto;}
+  .icon-round:hover{border-color:var(--accent);color:var(--accent);}
+  .icon-round.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+  .feature{
+    display:grid;grid-template-columns:1.15fr 1fr;min-height:640px;border-bottom:1px solid var(--line);
+  }
+  @media (max-width:860px){.feature{grid-template-columns:1fr;min-height:auto;}}
+  .feature-art{position:relative;overflow:hidden;background:var(--bg-1);display:flex;align-items:flex-end;padding:36px;}
+  .feature-art svg{position:absolute;inset:0;width:100%;height:100%;}
+  .index-counter{position:relative;z-index:2;font-family:'Archivo Black';display:flex;align-items:baseline;gap:2px;}
+  .index-counter .cur{font-size:34px;border-bottom:2px solid var(--ink);padding-bottom:2px;}
+  .index-counter .tot{font-size:15px;color:var(--ink-faint);font-family:'Manrope';font-weight:800;}
+  .feature-content{padding:clamp(28px,5vw,64px) clamp(24px,4vw,56px);display:flex;flex-direction:column;justify-content:center;}
+  .fc-dots{color:var(--ink-faint);letter-spacing:3px;font-size:14px;margin-bottom:18px;}
+  .fc-tagrow{display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap;}
+  .fc-tag{font-size:11px;font-weight:800;color:var(--ink-dim);letter-spacing:.03em;}
+  .stars{display:flex;gap:2px;color:var(--ink);}
+  .stars svg{width:12px;height:12px;}
+  .stars .off{color:var(--line);}
+  .fc-title{font-size:clamp(30px,4.2vw,50px);line-height:.98;margin-bottom:22px;}
+  .fc-actions{display:flex;align-items:center;gap:14px;margin-bottom:34px;flex-wrap:wrap;}
+  .gallery-label{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.1em;color:var(--ink-dim);text-transform:uppercase;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--line);width:fit-content;}
+  .gallery-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;max-width:340px;}
+  .gallery-grid .thumb{position:relative;aspect-ratio:16/10;overflow:hidden;background:#111;border:1px solid var(--line);display:block;}
+  .gallery-grid .thumb svg{width:100%;height:100%;display:block;}
+  .gallery-grid .thumb .pico{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+  .gallery-grid .thumb .pico svg{width:22px;height:22px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));}
+  .fc-syn{color:var(--ink-dim);font-size:14px;line-height:1.7;max-width:480px;margin-top:22px;}
+
+  section.rail{padding:44px clamp(20px,4vw,56px) 0;}
+  .rail-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;}
+  .rail-head h2{font-size:20px;}
+  .rail-head .see-all{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);border-bottom:1px solid var(--ink-faint);}
+  .rail-head .see-all:hover{color:var(--accent);border-color:var(--accent);}
+  .rail-scroll{display:flex;gap:16px;overflow-x:auto;padding-bottom:16px;scroll-snap-type:x proximity;}
+  .rail-scroll::-webkit-scrollbar{display:none;}
+
+  .card{flex:0 0 auto;width:172px;scroll-snap-align:start;display:flex;flex-direction:column;gap:9px;}
+  .poster{position:relative;width:172px;height:236px;overflow:hidden;border:1px solid var(--line);background:var(--bg-1);}
+  .poster .base{position:absolute;inset:0;}
+  .poster .num{position:absolute;bottom:8px;left:9px;font-family:'Archivo Black';font-size:11px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.5);}
+  .poster .rating{position:absolute;top:8px;right:8px;background:#fff;border:1px solid var(--line-strong);padding:2px 7px;font-size:10px;font-weight:800;display:flex;align-items:center;gap:4px;}
+  .poster .play-ov{position:absolute;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s ease;}
+  .card:hover .play-ov{opacity:1;}
+  .play-ov svg{width:34px;height:34px;}
+  .card-title{font-size:12.5px;font-weight:700;line-height:1.3;}
+  .card-sub{font-size:10.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.02em;}
+
+  .page-pad{padding:36px clamp(20px,4vw,56px) 64px;}
+  .catalog-head h1{font-size:clamp(26px,4vw,40px);margin-bottom:6px;}
+  .catalog-head p{color:var(--ink-faint);font-size:13px;}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:22px 0 30px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:16px 0;}
+  .filters select{background:#fff;border:1px solid var(--line);color:var(--ink);padding:9px 12px;font-size:12px;font-weight:700;}
+  .genre-pill{padding:8px 14px;border:1px solid var(--line);font-size:11px;font-weight:800;color:var(--ink-dim);background:#fff;text-transform:uppercase;letter-spacing:.03em;}
+  .genre-pill.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:22px;}
+  .catalog-grid .poster{width:100%;height:0;padding-bottom:135%;}
+  .catalog-grid .card{width:auto;}
+  .empty-state{padding:60px 0;text-align:center;color:var(--ink-faint);}
+  .empty-state h3{font-size:17px;color:var(--ink);margin-bottom:8px;font-family:'Archivo Black';}
+
+  .section-pad{padding:0 clamp(20px,4vw,56px) 60px;}
+  .ep-list{display:flex;flex-direction:column;max-width:860px;}
+  .ep-row{display:grid;grid-template-columns:52px 1fr auto;gap:16px;align-items:center;padding:16px 8px;border-bottom:1px solid var(--line);}
+  .ep-row:hover{background:var(--bg-1);}
+  .ep-num{font-family:'Archivo Black';font-size:20px;color:var(--ink-faint);}
+  .ep-info b{font-size:13.5px;display:block;}
+  .ep-info span{font-size:11.5px;color:var(--ink-faint);}
+  .ep-progress-bar{height:2px;background:var(--line);margin-top:6px;width:180px;max-width:40vw;}
+  .ep-progress-bar i{display:block;height:100%;background:var(--accent);}
+  .ep-row .icon-round{width:30px;height:30px;}
+  .ep-row .icon-round svg{width:11px;height:11px;}
+
+  .player-wrap{display:grid;grid-template-columns:1fr 320px;}
+  @media (max-width:860px){.player-wrap{grid-template-columns:1fr;}}
+  .stage{position:relative;aspect-ratio:16/9;background:#0a0a0a;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+  .stage .glow{position:absolute;inset:-20%;filter:blur(60px);opacity:.5;}
+  .stage-center{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:10px;color:rgba(255,255,255,.85);}
+  .big-play{width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;}
+  .big-play svg{width:26px;height:26px;}
+  .controls{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:10px 16px 14px;background:linear-gradient(to top, rgba(0,0,0,.85), transparent);display:flex;flex-direction:column;gap:8px;}
+  .seek{height:4px;background:rgba(255,255,255,.25);position:relative;cursor:pointer;}
+  .seek i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);}
+  .ctrl-row{display:flex;align-items:center;gap:14px;color:#fff;}
+  .ctrl-row .spacer{flex:1;}
+  .ctrl-row button{background:none;border:none;color:#fff;display:flex;}
+  .time-txt{font-size:12px;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.85);}
+  .next-ep-toast{position:absolute;bottom:70px;right:16px;z-index:4;background:#fff;border:1px solid var(--line);padding:14px;width:230px;display:none;}
+  .next-ep-toast.show{display:block;}
+  .next-ep-toast .ring{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .sidebar-eps{background:var(--bg-1);border-left:1px solid var(--line);overflow-y:auto;max-height:calc(100vh - 91px);}
+  .sidebar-eps h3{padding:16px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);border-bottom:1px solid var(--line);}
+  .side-ep{display:grid;grid-template-columns:66px 1fr;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);}
+  .side-ep.active{background:#fff;border-left:3px solid var(--accent);}
+  .side-ep .thumb{height:40px;}
+  .side-ep b{font-size:12px;display:block;margin-bottom:2px;}
+  .side-ep span{font-size:10.5px;color:var(--ink-faint);}
+  .below-player{padding:26px clamp(20px,4vw,56px);}
+
+  .profile-head{display:flex;gap:18px;align-items:center;margin-bottom:32px;}
+  .profile-head .avatar{width:64px;height:64px;font-size:22px;}
+  .tabs{display:flex;gap:26px;border-bottom:1px solid var(--line);margin-bottom:28px;}
+  .tab{padding:10px 2px;font-weight:800;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);border-bottom:2px solid transparent;}
+  .tab.active{color:var(--ink);border-color:var(--ink);}
+  .settings-row{display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid var(--line);max-width:520px;}
+  .settings-row span{font-size:13.5px;font-weight:600;}
+  .settings-row small{display:block;color:var(--ink-faint);font-size:11.5px;margin-top:2px;}
+  .toggle{width:40px;height:22px;border-radius:999px;background:var(--line);position:relative;border:none;}
+  .toggle.on{background:var(--accent);}
+  .toggle i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s ease;}
+  .toggle.on i{left:20px;}
+
+  .auth-wrap{min-height:calc(100vh - 91px);display:flex;align-items:center;justify-content:center;padding:40px 20px;background:var(--bg-1);}
+  .auth-card{width:100%;max-width:380px;background:#fff;border:1px solid var(--line);padding:34px;}
+  .auth-card h1{font-size:24px;margin-bottom:6px;}
+  .auth-card p.sub{color:var(--ink-faint);font-size:12.5px;margin-bottom:24px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:11px;font-weight:800;color:var(--ink-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;}
+  .field input{width:100%;background:#fff;border:1px solid var(--line);color:var(--ink);padding:11px 13px;font-size:14px;}
+  .field input:focus{border-color:var(--ink);}
+  .auth-submit{width:100%;justify-content:center;}
+  .auth-alt{display:flex;align-items:center;gap:10px;margin:20px 0;color:var(--ink-faint);font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+  .auth-alt::before,.auth-alt::after{content:"";flex:1;height:1px;background:var(--line);}
+  .social-btn{width:100%;justify-content:center;background:#fff;border:1.5px solid var(--ink);color:var(--ink);margin-bottom:10px;}
+  .switch-line{text-align:center;font-size:12.5px;color:var(--ink-faint);margin-top:18px;}
+  .switch-line a{color:var(--accent);font-weight:800;}
+
+  .toast-msg{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--ink);color:#fff;padding:12px 22px;font-size:12.5px;font-weight:700;z-index:200;transition:transform .25s ease;}
+  .toast-msg.show{transform:translateX(-50%) translateY(0);}
+
+  @media (max-width:760px){
+    nav.mainnav{display:none;}
+    .search-wrap{display:none;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* =====================================================
+   KUROSHI — protótipo de site de streaming de anime
+   Dados fictícios (nenhuma IP real) — front-end apenas.
+   ===================================================== */
+
+const GENRES = ["Ação","Fantasia","Aventura","Drama","Comédia","Ficção Científica","Romance","Sobrenatural","Esporte","Suspense"];
+
+const GENRE_TONE = {
+  "Ação": "#c8102e", "Fantasia":"#5b3fae", "Aventura":"#0f8b6c", "Drama":"#33517a",
+  "Comédia":"#c78a12", "Ficção Científica":"#136d8a", "Romance":"#b23a63",
+  "Sobrenatural":"#5a3a86", "Esporte":"#b5560f", "Suspense":"#4a4a4a"
+};
+
+function seededRand(seed){ let x = Math.sin(seed) * 10000; return x - Math.floor(x); }
+
+/* Marca geométrica abstrata usada no lugar de arte de personagem
+   (sem ilustrações reais de anime licenciadas) */
+function emblemSvg(anime, seed){
+  const tone = GENRE_TONE[anime.genres[0]] || "#111";
+  const s = seed + anime.id.length*17;
+  const capeSway = 8 + seededRand(s)*10;
+  return `<svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="body${s}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${tone}" stop-opacity="0.95"/>
+        <stop offset="100%" stop-color="${tone}" stop-opacity="0.55"/>
+      </linearGradient>
+      <radialGradient id="glow${s}"><stop offset="0%" stop-color="${tone}" stop-opacity="0.35"/><stop offset="100%" stop-color="${tone}" stop-opacity="0"/></radialGradient>
+    </defs>
+    <circle cx="230" cy="230" r="200" fill="url(#glow${s})"/>
+    <polygon points="200,60 340,150 340,260 200,340 60,260 60,150" fill="none" stroke="#111" stroke-opacity="0.06" stroke-width="2" transform="rotate(${(s%40)-20} 200 200)"/>
+    <polygon points="200,60 340,150 340,260 200,340 60,260 60,150" fill="none" stroke="#111" stroke-opacity="0.04" stroke-width="1.5" transform="rotate(${(s%20)-10} 200 200) scale(0.7)" transform-origin="200 200"/>
+    <path d="M200,120 C ${140-capeSway},170 ${120-capeSway},260 ${150-capeSway},380 L${250+capeSway},380 C${280+capeSway},260 ${260+capeSway},170 200,120 Z" fill="url(#body${s})"/>
+    <circle cx="200" cy="96" r="34" fill="url(#body${s})"/>
+    <line x1="120" y1="260" x2="300" y2="90" stroke="#111" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+    <line x1="120" y1="260" x2="300" y2="90" stroke="${tone}" stroke-width="10" stroke-linecap="round" opacity="0.18"/>
+  </svg>`;
+}
+
+function sceneSvg(anime, seed){
+  const tone = GENRE_TONE[anime.genres[0]] || "#111";
+  const s = seed + anime.id.length*29;
+  let lines=[];
+  for(let i=0;i<5;i++){
+    const y = seededRand(s+i)*100;
+    lines.push(`<line x1="0" y1="${y}" x2="100" y2="${y-40+seededRand(s+i+2)*20}" stroke="#fff" stroke-opacity="0.06" stroke-width="2"/>`);
+  }
+  return `<svg viewBox="0 0 100 62" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="62" fill="#0d0d0d"/>
+    <circle cx="${20+seededRand(s)*60}" cy="${20+seededRand(s+1)*25}" r="${18+seededRand(s+2)*14}" fill="${tone}" opacity="0.55"/>
+    ${lines.join("")}
+  </svg>`;
+}
+
+const ANIME = [
+  {id:"a1", title:"Kagerō Requiem", alt:"陽炎レクイエム", genres:["Ação","Sobrenatural"], year:2024, rating:8.7, status:"em exibição", studio:"Studio Amaranth", eps:14,
+   synopsis:"Numa cidade dividida entre o mundo dos vivos e o dos espíritos que se recusam a partir, uma jovem exorcista herda uma lâmina capaz de ouvir os últimos desejos dos mortos — e descobre que cada desejo concedido cobra um preço de quem ainda respira."},
+  {id:"a2", title:"Garota da Órbita Zero", alt:"Zero Orbit Girl", genres:["Ficção Científica","Drama"], year:2023, rating:8.2, status:"finalizado", studio:"Nightloom Pictures", eps:24,
+   synopsis:"Em uma estação espacial abandonada pela Terra, a última tripulante ainda viva mantém contato diário com uma inteligência artificial que finge ser sua irmã morta, até que um sinal externo ameaça revelar qual das duas está mentindo há mais tempo."},
+  {id:"a3", title:"Confeitaria Yotsuba", alt:"よつば菓子店", genres:["Comédia","Romance"], year:2022, rating:7.9, status:"finalizado", studio:"Warmlight", eps:12,
+   synopsis:"Um confeiteiro desastrado assume a padaria da avó falecida e descobre que cada doce antigo da receita carrega uma memória — e um cliente frequente que jura já ter provado tudo aquilo antes, em outra vida."},
+  {id:"a4", title:"Choque de Lâminas: Genroku", alt:"刃鳴 元禄", genres:["Ação","Aventura"], year:2021, rating:8.5, status:"finalizado", studio:"Ironvale", eps:26,
+   synopsis:"Um ronin sem nome atravessa um Japão fantasiado por clãs em guerra, carregando uma espada que só pode ser desembainhada uma última vez — e precisa decidir contra quem, ou por quem, gastar esse golpe final."},
+  {id:"a5", title:"Constelação Partida", alt:"Broken Constellation", genres:["Fantasia","Aventura"], year:2024, rating:9.0, status:"em exibição", studio:"Studio Amaranth", eps:8,
+   synopsis:"Quando as estrelas de um reino começam a cair uma a uma, uma cartógrafa cega é a única capaz de 'ler' o céu pelo som que as constelações fazem ao se apagar — e a última estrela que resta é a de sua própria casa."},
+  {id:"a6", title:"Clube de Xadrez do Meio-Dia", alt:"昼の将棋部", genres:["Drama","Esporte"], year:2020, rating:7.6, status:"finalizado", studio:"Warmlight", eps:13,
+   synopsis:"Um prodígio do xadrez que abandonou torneios após uma derrota pública encontra, num clube escolar sem verba nem reputação, o único adversário disposto a perder de propósito só para vê-lo jogar de novo."},
+  {id:"a7", title:"Máquinas do Crepúsculo Vermelho", alt:"Red Dusk Machines", genres:["Ficção Científica","Ação"], year:2023, rating:8.1, status:"em exibição", studio:"Ironvale", eps:20,
+   synopsis:"Pilotos adolescentes recrutados para operar mechas de sucata contra uma invasão que ninguém consegue explicar direito descobrem, aos poucos, que as máquinas que pilotam foram construídas com peças de guerras anteriores que a história oficial apagou."},
+  {id:"a8", title:"O Apartamento 402 Tem Fantasmas", alt:"402号室には幽霊がいる", genres:["Comédia","Sobrenatural"], year:2022, rating:7.4, status:"finalizado", studio:"Nightloom Pictures", eps:12,
+   synopsis:"Uma universitária sem dinheiro aluga o único apartamento barato da cidade e descobre por que era tão barato: três fantasmas moram lá, cada um preso a um eletrodoméstico diferente, e nenhum quer dividir a conta de luz."},
+  {id:"a9", title:"Verão de Vidro", alt:"Glass Summer", genres:["Romance","Drama"], year:2019, rating:8.4, status:"finalizado", studio:"Warmlight", eps:11,
+   synopsis:"Dois vizinhos de infância que pararam de se falar depois de uma promessa quebrada se reencontram no último verão antes da faculdade, obrigados a dividir o mesmo trabalho de meio período numa sorveteria à beira-mar."},
+  {id:"a10", title:"Guilda dos Ventos Cinzentos", alt:"灰風の組合", genres:["Fantasia","Aventura"], year:2021, rating:7.8, status:"finalizado", studio:"Ironvale", eps:24,
+   synopsis:"Numa guilda de aventureiros de segunda categoria, um grupo de fracassados aceita a única missão que ninguém mais quer: escoltar um dragão idoso e desmemoriado até o lugar onde ele acha que nasceu."},
+  {id:"a11", title:"Frequência Nocturna", alt:"Night Frequency", genres:["Suspense","Ficção Científica"], year:2024, rating:8.6, status:"em exibição", studio:"Nightloom Pictures", eps:10,
+   synopsis:"Uma operadora de rádio noturno começa a receber, entre uma música e outra, ligações de ouvintes que ainda não nasceram — todos pedindo a mesma coisa: que ela não leia ao ar a notícia que vai transmitir amanhã."},
+  {id:"a12", title:"Time Sem Capitão", alt:"キャプテン不在", genres:["Esporte","Comédia"], year:2020, rating:7.5, status:"finalizado", studio:"Studio Amaranth", eps:13,
+   synopsis:"O pior time de vôlei da liga escolar perde seu técnico, seu capitão e sua quadra no mesmo mês — e sobra para a gerente mais nova, que nunca jogou uma partida, decidir se vale a pena continuar existindo."},
+  {id:"a13", title:"A Bibliotecária do Fim do Mundo", alt:"終末の司書", genres:["Drama","Fantasia"], year:2023, rating:8.9, status:"em exibição", studio:"Ironvale", eps:16,
+   synopsis:"Depois que o mundo praticamente acaba, a última biblioteca em pé continua recebendo um visitante por dia — sempre diferente, sempre à procura de um livro que a bibliotecária jura nunca ter catalogado."},
+  {id:"a14", title:"Corações em Modo Avião", alt:"Hearts on Airplane Mode", genres:["Romance","Comédia"], year:2022, rating:7.3, status:"finalizado", studio:"Nightloom Pictures", eps:12,
+   synopsis:"Dois estranhos presos num aeroporto durante uma tempestade de 30 horas fazem um pacto: contar só verdades um ao outro, já que nunca mais vão se ver de novo — até descobrirem que compraram passagem para a mesma cidade."}
+];
+
+function findAnime(id){ return ANIME.find(a=>a.id===id); }
+function animeIndex(id){ return ANIME.findIndex(a=>a.id===id)+1; }
+
+const store = {
+  get(key, fallback){ try{ const v = localStorage.getItem("kuroshi:"+key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; } },
+  set(key, val){ try{ localStorage.setItem("kuroshi:"+key, JSON.stringify(val)); }catch(e){} }
+};
+
+let state = {
+  view: "home", params: {},
+  favorites: store.get("favorites", []),
+  history: store.get("history", []),
+  user: store.get("user", null),
+  catalogFilters: { genre: "Todos", status: "Todos", sort: "popularidade", q: "" }
+};
+
+function saveState(){ store.set("favorites", state.favorites); store.set("history", state.history); store.set("user", state.user); }
+
+function go(view, params={}){ state.view = view; state.params = params; window.scrollTo({top:0, behavior:"instant"}); render(); }
+
+function toast(msg){
+  let el = document.querySelector(".toast-msg");
+  if(!el){ el = document.createElement("div"); el.className = "toast-msg"; document.body.appendChild(el); }
+  el.textContent = msg;
+  requestAnimationFrame(()=>el.classList.add("show"));
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove("show"), 2200);
+}
+
+function toggleFavorite(id){
+  const i = state.favorites.indexOf(id);
+  if(i>-1){ state.favorites.splice(i,1); toast("Removido dos favoritos"); }
+  else { state.favorites.push(id); toast("Adicionado aos favoritos"); }
+  saveState(); render();
+}
+function isFavorite(id){ return state.favorites.includes(id); }
+
+function recordProgress(animeId, ep, progress){
+  let entry = state.history.find(h=>h.animeId===animeId);
+  if(!entry){ entry = {animeId, ep, progress}; state.history.unshift(entry); }
+  else { entry.ep = ep; entry.progress = progress; state.history = [entry, ...state.history.filter(h=>h!==entry)]; }
+  state.history = state.history.slice(0,20);
+  saveState();
+}
+
+const ICO = {
+  search: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+  home: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>`,
+  play: `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>`,
+  playBig: `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>`,
+  playOutline: `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6"><polygon points="7,5 20,12 7,19"/></svg>`,
+  pause: `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`,
+  check: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,13 9,18 20,6"/></svg>`,
+  starFull: `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15,9 22,9.5 16.5,14 18.5,21 12,17 5.5,21 7.5,14 2,9.5 9,9"/></svg>`,
+  heart: (filled)=>`<svg width="14" height="14" viewBox="0 0 24 24" fill="${filled?'currentColor':'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>`,
+  calendar: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="1"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  film: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="1"/><line x1="7" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="17" y2="21"/></svg>`,
+  building: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20"/><line x1="9" y1="7" x2="9" y2="7.01"/><line x1="15" y1="7" x2="15" y2="7.01"/><line x1="9" y1="12" x2="9" y2="12.01"/><line x1="15" y1="12" x2="15" y2="12.01"/></svg>`,
+  next: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,4 15,12 5,20"/><rect x="17" y="4" width="2.5" height="16"/></svg>`,
+  prev: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="19,4 9,12 19,20"/><rect x="4.5" y="4" width="2.5" height="16"/></svg>`,
+  vol: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polygon points="3,9 8,9 13,4 13,20 8,15 3,15" fill="white" stroke="none"/><path d="M16 8a5 5 0 0 1 0 8"/></svg>`,
+  full: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`
+};
+
+function starsRow(rating){
+  const filled = Math.round(rating/2);
+  let out = "";
+  for(let i=0;i<5;i++) out += `<span class="${i<filled?'':'off'}">${ICO.starFull}</span>`;
+  return `<div class="stars">${out}</div>`;
+}
+
+function card(anime){
+  return `<a class="card" href="#" onclick="go('detail',{id:'${anime.id}'});return false;">
+    <div class="poster">
+      <div class="base">${emblemSvg(anime, animeIndex(anime.id)*3)}</div>
+      <div class="rating">${ICO.starFull.replace('viewBox="0 0 24 24"','width="9" height="9" viewBox="0 0 24 24"')}${anime.rating.toFixed(1)}</div>
+      <div class="num">${anime.eps} eps</div>
+      <div class="play-ov">${ICO.playOutline}</div>
+    </div>
+    <div class="card-title">${anime.title}</div>
+    <div class="card-sub">${anime.genres.join(" / ")}</div>
+  </a>`;
+}
+
+function rail(title, list, seeAllView){
+  if(list.length===0) return "";
+  return `<section class="rail">
+    <div class="rail-head"><h2>${title}</h2>${seeAllView ? `<a class="see-all" href="#" onclick="go('${seeAllView}');return false;">Ver tudo</a>` : ""}</div>
+    <div class="rail-scroll">${list.map(card).join("")}</div>
+  </section>`;
+}
+
+function topNav(active){
+  const links = [["Ajuda","help"],["Catálogo","catalog"],["Em Alta","catalog"],["Sobre","about"]];
+  return `<header class="topbar">
+    <a class="brand" href="#" onclick="go('home');return false;"><b>KUROSHI</b><small>ANIME STREAM</small></a>
+    <nav class="mainnav">
+      ${links.map(([label,v])=>`<a href="#" class="${active===v?'active':''}" onclick="${v==='help'||v==='about'?`toast('Em breve');return false;`:`go('${v}');return false;`}">${label}</a>`).join("")}
+      <a href="#" class="${active==='home'?'active':''}" onclick="go('home');return false;">Início</a>
+    </nav>
+    <div class="topbar-actions">
+      <div class="search-wrap">${ICO.search}
+        <input type="text" placeholder="Buscar..." value="${state.catalogFilters.q||''}"
+          onkeydown="if(event.key==='Enter'){ state.catalogFilters.q=this.value; go('catalog'); }">
+      </div>
+      ${state.user
+        ? `<a href="#" onclick="go('profile');return false;" class="avatar" title="${state.user.name}">${state.user.name[0].toUpperCase()}</a>`
+        : `<button class="btn btn-solid btn-sm" onclick="go('login')">Entrar</button>`}
+      <button class="icon-sq" title="Início" onclick="go('home')">${ICO.home}</button>
+    </div>
+  </header>`;
+}
+
+function siteFooter(){
+  return `<footer class="sitefoot">
+    <span>KUROSHI — protótipo de portfólio, sem afiliação com serviços de streaming reais.</span>
+    <span>Copyright © 2026 Kuroshi. Catálogo e ilustrações fictícios.</span>
+  </footer>`;
+}
+
+function galleryThumbs(anime){
+  return `<div class="gallery-grid">
+    ${[1,2,3,4].map(n=>`
+      <a class="thumb" href="#" onclick="go('player',{id:'${anime.id}',ep:${n<=anime.eps?n:1}});return false;">
+        ${sceneSvg(anime, n*41)}
+        <div class="pico">${n%2===1 ? ICO.playOutline : ''}</div>
+      </a>`).join("")}
+  </div>`;
+}
+
+function featureBlock(anime, opts){
+  opts = opts || {};
+  const fav = isFavorite(anime.id);
+  const hist = state.history.find(h=>h.animeId===anime.id);
+  return `<section class="feature">
+    <div class="feature-art">
+      ${emblemSvg(anime, animeIndex(anime.id)*7)}
+      <div class="index-counter"><span class="cur">${String(animeIndex(anime.id)).padStart(2,'0')}</span><span class="tot">/${ANIME.length}</span></div>
+    </div>
+    <div class="feature-content">
+      <div class="fc-dots">•••</div>
+      <div class="fc-tagrow">
+        <span class="fc-tag">#${animeIndex(anime.id)} ${anime.genres[0]}</span>
+        ${starsRow(anime.rating)}
+      </div>
+      <h1 class="fc-title">${anime.title}</h1>
+      <div class="fc-actions">
+        <button class="btn btn-solid" onclick="go('player',{id:'${anime.id}',ep:${hist?hist.ep:1}})">${ICO.play} ${hist?"Continuar":"Assistir"}</button>
+        <button class="btn btn-outline" onclick="go('detail',{id:'${anime.id}'})">${ICO.check} Detalhes</button>
+        <button class="icon-round ${fav?'on':''}" title="Favoritar" onclick="toggleFavorite('${anime.id}')">${ICO.heart(fav)}</button>
+      </div>
+      <div>
+        <div class="gallery-label">Minha Galeria ▾</div>
+        ${galleryThumbs(anime)}
+      </div>
+      ${opts.showSynopsis ? `<p class="fc-syn">${anime.synopsis}</p>` : ""}
+    </div>
+  </section>`;
+}
+
+function viewHome(){
+  const featured = ANIME[3];
+  const emAlta = [...ANIME].sort((a,b)=>b.rating-a.rating).slice(0,8);
+  const lancamentos = ANIME.filter(a=>a.status==="em exibição");
+  const continuar = state.history.map(h=>findAnime(h.animeId)).filter(Boolean);
+  const recomendados = [...ANIME].slice().reverse().slice(0,8);
+
+  return `
+  ${featureBlock(featured, {showSynopsis:true})}
+  ${continuar.length ? rail("Continuar assistindo", continuar) : ""}
+  ${rail("Em alta", emAlta, "catalog")}
+  ${rail("Lançamentos", lancamentos, "catalog")}
+  ${rail("Recomendados para você", recomendados, "catalog")}
+  <div style="height:40px"></div>`;
+}
+
+function viewCatalog(){
+  const f = state.catalogFilters;
+  let list = ANIME.filter(a=>{
+    if(f.genre!=="Todos" && !a.genres.includes(f.genre)) return false;
+    if(f.status!=="Todos" && a.status!==f.status) return false;
+    if(f.q && !(a.title.toLowerCase().includes(f.q.toLowerCase()) || a.alt.toLowerCase().includes(f.q.toLowerCase()))) return false;
+    return true;
+  });
+  if(f.sort==="popularidade") list.sort((a,b)=>b.rating-a.rating);
+  if(f.sort==="ano") list.sort((a,b)=>b.year-a.year);
+  if(f.sort==="az") list.sort((a,b)=>a.title.localeCompare(b.title));
+
+  return `<div class="page-pad">
+    <div class="catalog-head"><h1>Catálogo</h1><p>${list.length} título${list.length===1?"":"s"} encontrado${list.length===1?"":"s"}</p></div>
+    <div class="filters">
+      ${["Todos", ...GENRES].map(g=>`<button class="genre-pill ${f.genre===g?'active':''}" onclick="state.catalogFilters.genre='${g}';go('catalog')">${g}</button>`).join("")}
+      <select onchange="state.catalogFilters.status=this.value;go('catalog')">
+        <option ${f.status==="Todos"?"selected":""} value="Todos">Todos os status</option>
+        <option ${f.status==="em exibição"?"selected":""} value="em exibição">Em exibição</option>
+        <option ${f.status==="finalizado"?"selected":""} value="finalizado">Finalizado</option>
+      </select>
+      <select onchange="state.catalogFilters.sort=this.value;go('catalog')">
+        <option value="popularidade" ${f.sort==="popularidade"?"selected":""}>Mais populares</option>
+        <option value="ano" ${f.sort==="ano"?"selected":""}>Mais recentes</option>
+        <option value="az" ${f.sort==="az"?"selected":""}>A–Z</option>
+      </select>
+    </div>
+    ${list.length ? `<div class="catalog-grid">${list.map(card).join("")}</div>` : `<div class="empty-state"><h3>Nada por aqui ainda</h3><p>Tente outro gênero, status ou termo de busca.</p></div>`}
+  </div>`;
+}
+
+function viewDetail(params){
+  const a = findAnime(params.id);
+  if(!a) return `<div class="page-pad"><p>Anime não encontrado.</p></div>`;
+  const eps = Array.from({length:a.eps}, (_,i)=>i+1);
+  const hist = state.history.find(h=>h.animeId===a.id);
+
+  return `
+  ${featureBlock(a, {showSynopsis:true})}
+  <div class="section-pad" style="padding-top:44px;">
+    <h2 style="font-size:17px;margin-bottom:16px;letter-spacing:.02em;">Episódios</h2>
+    <div class="ep-list">
+      ${eps.map(n=>{
+        const isCurrent = hist && hist.ep===n;
+        const progress = isCurrent ? Math.round(hist.progress*100) : (hist && n<hist.ep ? 100 : 0);
+        return `<a href="#" class="ep-row" onclick="go('player',{id:'${a.id}',ep:${n}});return false;">
+          <div class="ep-num">${String(n).padStart(2,'0')}</div>
+          <div class="ep-info"><b>Episódio ${n}</b><span>~24 min · ${a.studio}</span>
+            ${progress>0 ? `<div class="ep-progress-bar"><i style="width:${progress}%"></i></div>` : ""}
+          </div>
+          <div class="icon-round">${ICO.play}</div>
+        </a>`;
+      }).join("")}
+    </div>
+  </div>`;
+}
+
+let playerTimer = null;
+function viewPlayer(params){
+  const a = findAnime(params.id);
+  if(!a) return `<div class="page-pad"><p>Anime não encontrado.</p></div>`;
+  const ep = Math.min(Math.max(1, params.ep||1), a.eps);
+  const tone = GENRE_TONE[a.genres[0]] || "#444";
+  const hist = state.history.find(h=>h.animeId===a.id);
+  const startProgress = (hist && hist.ep===ep) ? hist.progress : 0;
+
+  setTimeout(()=>initPlayer(a, ep, startProgress), 0);
+
+  return `
+  <div class="player-wrap">
+    <div>
+      <div class="stage" id="stage">
+        <div class="glow" style="background:${tone}"></div>
+        <div class="stage-center" id="stageCenter">
+          <button class="big-play" onclick="playerToggle()">${ICO.playBig}</button>
+          <div style="font-size:13px;color:rgba(255,255,255,.7)">${a.title} — Episódio ${ep}</div>
+        </div>
+        <div class="next-ep-toast" id="nextToast">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;"><div class="ring"></div><b style="font-size:13px;">Próximo episódio em breve</b></div>
+          <div style="font-size:12px;color:var(--ink-faint);margin-bottom:10px;">Episódio ${ep+1} começa automaticamente.</div>
+          <button class="btn btn-sm btn-outline" style="width:100%;justify-content:center;" onclick="cancelAutoplay()">Cancelar</button>
+        </div>
+        <div class="controls" id="controls">
+          <div class="seek" id="seek" onclick="playerSeek(event)"><i id="seekFill" style="width:${startProgress*100}%"></i></div>
+          <div class="ctrl-row">
+            <button onclick="playerSkip(-1)" title="Episódio anterior">${ICO.prev}</button>
+            <button onclick="playerToggle()" id="playPauseBtn">${ICO.playBig}</button>
+            <button onclick="playerSkip(1)" title="Próximo episódio">${ICO.next}</button>
+            <span class="time-txt" id="timeTxt">0:00 / 24:00</span>
+            <span class="spacer"></span>
+            <button title="Volume">${ICO.vol}</button>
+            <button title="Tela cheia">${ICO.full}</button>
+          </div>
+        </div>
+      </div>
+      <div class="below-player">
+        <h1 style="font-size:21px;margin-bottom:6px;">${a.title}</h1>
+        <p style="color:var(--ink-faint);font-size:12.5px;margin-bottom:16px;">Episódio ${ep} de ${a.eps} · ${a.genres.join(" / ")}</p>
+        <p style="color:var(--ink-dim);font-size:14px;line-height:1.6;max-width:700px;">${a.synopsis}</p>
+        <div style="margin-top:18px;display:flex;gap:12px;">
+          <button class="btn btn-outline btn-sm" onclick="toggleFavorite('${a.id}')">${ICO.heart(isFavorite(a.id))} ${isFavorite(a.id)?"Nos favoritos":"Favoritar"}</button>
+          <button class="btn btn-outline btn-sm" onclick="go('detail',{id:'${a.id}'})">Ver detalhes</button>
+        </div>
+      </div>
+    </div>
+    <div class="sidebar-eps">
+      <h3>Episódios — ${a.title}</h3>
+      ${Array.from({length:a.eps},(_,i)=>i+1).map(n=>`
+        <a href="#" class="side-ep ${n===ep?'active':''}" onclick="go('player',{id:'${a.id}',ep:${n}});return false;">
+          <div class="thumb">${sceneSvg(a, n*17)}</div>
+          <div><b>Episódio ${n}</b><span>${n===ep?"Assistindo agora":"~24 min"}</span></div>
+        </a>`).join("")}
+    </div>
+  </div>`;
+}
+
+function initPlayer(anime, ep, startProgress){
+  clearInterval(playerTimer);
+  const totalSeconds = 24*60;
+  let seconds = Math.floor(startProgress*totalSeconds);
+  window._player = { playing:false, seconds, totalSeconds, anime, ep };
+
+  function fmt(s){ const m=Math.floor(s/60), r=Math.floor(s%60); return `${m}:${String(r).padStart(2,'0')}`; }
+  function updateUI(){
+    const fill = document.getElementById("seekFill");
+    const txt = document.getElementById("timeTxt");
+    if(fill) fill.style.width = (window._player.seconds/window._player.totalSeconds*100)+"%";
+    if(txt) txt.textContent = `${fmt(window._player.seconds)} / ${fmt(window._player.totalSeconds)}`;
+    recordProgress(anime.id, ep, window._player.seconds/window._player.totalSeconds);
+  }
+  updateUI();
+
+  playerTimer = setInterval(()=>{
+    if(!window._player.playing) return;
+    window._player.seconds += 1;
+    if(window._player.seconds >= window._player.totalSeconds){
+      window._player.seconds = window._player.totalSeconds;
+      window._player.playing = false;
+      updateUI();
+      triggerNextEpisode();
+      return;
+    }
+    updateUI();
+  }, 1000/8);
+}
+
+function playerToggle(){
+  if(!window._player) return;
+  window._player.playing = !window._player.playing;
+  const center = document.getElementById("stageCenter");
+  const btn = document.getElementById("playPauseBtn");
+  if(window._player.playing){ if(center) center.style.display = "none"; if(btn) btn.innerHTML = ICO.pause; }
+  else { if(center) center.style.display = "flex"; if(btn) btn.innerHTML = ICO.playBig; }
+}
+function playerSeek(e){
+  if(!window._player) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = Math.min(1, Math.max(0, (e.clientX-rect.left)/rect.width));
+  window._player.seconds = Math.floor(pct * window._player.totalSeconds);
+}
+function playerSkip(dir){
+  const a = window._player.anime, ep = window._player.ep;
+  go('player', {id:a.id, ep: Math.min(a.eps, Math.max(1, ep+dir))});
+}
+let autoplayTimer = null;
+function triggerNextEpisode(){
+  const a = window._player.anime, ep = window._player.ep;
+  if(ep >= a.eps) return;
+  const toastEl = document.getElementById("nextToast");
+  if(toastEl) toastEl.classList.add("show");
+  autoplayTimer = setTimeout(()=>{ go('player',{id:a.id, ep:ep+1}); }, 6000);
+}
+function cancelAutoplay(){
+  clearTimeout(autoplayTimer);
+  const toastEl = document.getElementById("nextToast");
+  if(toastEl) toastEl.classList.remove("show");
+}
+
+function viewProfile(){
+  if(!state.user){
+    return `<div class="page-pad"><div class="empty-state"><h3>Você ainda não entrou</h3><p>Entre na sua conta para ver histórico e favoritos.</p>
+    <div style="margin-top:16px"><button class="btn btn-solid" onclick="go('login')">Entrar</button></div></div></div>`;
+  }
+  const tab = state.params.tab || "historico";
+  const histItems = state.history.map(h=>({...h, anime:findAnime(h.animeId)})).filter(h=>h.anime);
+  const favItems = state.favorites.map(findAnime).filter(Boolean);
+
+  function tabBtn(id,label){ return `<a href="#" class="tab ${tab===id?'active':''}" onclick="go('profile',{tab:'${id}'});return false;">${label}</a>`; }
+
+  let body = "";
+  if(tab==="historico"){
+    body = histItems.length ? `<div class="catalog-grid">${histItems.map(h=>card(h.anime)).join("")}</div>` : `<div class="empty-state"><h3>Sem histórico ainda</h3><p>Os episódios que você assistir aparecem aqui.</p></div>`;
+  } else if(tab==="favoritos"){
+    body = favItems.length ? `<div class="catalog-grid">${favItems.map(card).join("")}</div>` : `<div class="empty-state"><h3>Nenhum favorito ainda</h3><p>Toque no coração de um anime para guardá-lo aqui.</p></div>`;
+  } else {
+    body = `
+      <div class="settings-row"><div><span>Reprodução automática</span><small>Ir para o próximo episódio automaticamente</small></div><button class="toggle on" onclick="this.classList.toggle('on')"><i></i></button></div>
+      <div class="settings-row"><div><span>Legendas por padrão</span><small>Português (Brasil)</small></div><button class="toggle on" onclick="this.classList.toggle('on')"><i></i></button></div>
+      <div class="settings-row"><div><span>Notificações de novos episódios</span><small>Somente para animes favoritados</small></div><button class="toggle on" onclick="this.classList.toggle('on')"><i></i></button></div>
+      <div style="margin-top:24px;"><button class="btn btn-outline" onclick="doLogout()">Sair da conta</button></div>`;
+  }
+
+  return `<div class="page-pad">
+    <div class="profile-head"><div class="avatar">${state.user.name[0].toUpperCase()}</div>
+      <div><h1 style="font-size:22px;">${state.user.name}</h1><p style="color:var(--ink-faint);font-size:12.5px;">${state.user.email}</p></div></div>
+    <div class="tabs">${tabBtn("historico","Histórico")}${tabBtn("favoritos","Favoritos")}${tabBtn("config","Configurações")}</div>
+    ${body}
+  </div>`;
+}
+
+function viewAuth(){
+  const mode = state.params.mode || "login";
+  return `<div class="auth-wrap"><div class="auth-card">
+      <h1>${mode==="login"?"Bem-vindo de volta":"Criar conta"}</h1>
+      <p class="sub">${mode==="login"?"Entre para continuar de onde parou.":"Leva menos de um minuto."}</p>
+      <form onsubmit="return doAuthSubmit(event,'${mode}')">
+        ${mode==="cadastro" ? `<div class="field"><label>Nome</label><input required name="name" type="text" placeholder="Seu nome"></div>` : ""}
+        <div class="field"><label>E-mail</label><input required name="email" type="email" placeholder="voce@email.com"></div>
+        <div class="field"><label>Senha</label><input required name="password" type="password" placeholder="••••••••" minlength="4"></div>
+        <button class="btn btn-solid auth-submit" type="submit">${mode==="login"?"Entrar":"Criar conta"}</button>
+      </form>
+      <div class="auth-alt">ou continue com</div>
+      <button class="btn social-btn" onclick="doSocialLogin()">Continuar com Google</button>
+      <p class="switch-line">${mode==="login" ? `Não tem conta? <a href="#" onclick="go('login',{mode:'cadastro'});return false;">Cadastre-se</a>` : `Já tem conta? <a href="#" onclick="go('login',{mode:'login'});return false;">Entrar</a>`}</p>
+  </div></div>`;
+}
+function doAuthSubmit(e, mode){
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const name = f.get("name") || (f.get("email")||"").split("@")[0] || "Usuário";
+  state.user = { name, email: f.get("email") };
+  saveState(); toast(mode==="login" ? "Login realizado" : "Conta criada"); go("home");
+  return false;
+}
+function doSocialLogin(){ state.user = { name:"Convidado Google", email:"convidado@gmail.com" }; saveState(); toast("Login com Google realizado"); go("home"); }
+function doLogout(){ state.user = null; saveState(); toast("Você saiu da conta"); go("home"); }
+
+function render(){
+  clearInterval(playerTimer);
+  const v = state.view;
+  let body = "";
+  if(v==="home") body = viewHome();
+  else if(v==="catalog") body = viewCatalog();
+  else if(v==="detail") body = viewDetail(state.params);
+  else if(v==="player") body = viewPlayer(state.params);
+  else if(v==="profile") body = viewProfile();
+  else if(v==="login") body = viewAuth();
+  else body = viewHome();
+
+  document.getElementById("app").innerHTML = `${topNav(v)}<main>${body}</main>${v!=="player" ? siteFooter() : ""}`;
+}
+
+render();
+</script>
+</body>
+</html>
