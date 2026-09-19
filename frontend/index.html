@@ -109,8 +109,8 @@
   }
   @media (max-width:860px){.feature{grid-template-columns:1fr;min-height:auto;}}
   .feature-art{position:relative;overflow:hidden;background:var(--bg-1);display:flex;align-items:flex-end;padding:36px;}
-  .feature-art svg{position:absolute;inset:0;width:100%;height:100%;}
-  .index-counter{position:relative;z-index:2;font-family:'Archivo Black';display:flex;align-items:baseline;gap:2px;}
+  .feature-art svg, .feature-art img{position:absolute;inset:0;width:100%;height:100%;}
+  .index-counter{position:relative;z-index:2;font-family:'Archivo Black';display:flex;align-items:baseline;gap:2px;background:rgba(255,255,255,.88);padding:6px 10px;backdrop-filter:blur(2px);}
   .index-counter .cur{font-size:34px;border-bottom:2px solid var(--ink);padding-bottom:2px;}
   .index-counter .tot{font-size:15px;color:var(--ink-faint);font-family:'Manrope';font-weight:800;}
   .feature-content{padding:clamp(28px,5vw,64px) clamp(24px,4vw,56px);display:flex;flex-direction:column;justify-content:center;}
@@ -330,9 +330,125 @@ const ANIME = [
 function findAnime(id){ return ANIME.find(a=>a.id===id); }
 function animeIndex(id){ return ANIME.findIndex(a=>a.id===id)+1; }
 
+/* Semente determinística a partir de qualquer id (mock ou de uma API real),
+   usada pra gerar o emblema/cena sem depender do array ANIME local. */
+function seedFromId(id){
+  let h = 0;
+  for(const c of String(id)) h = (h*31 + c.charCodeAt(0)) >>> 0;
+  return h % 1000;
+}
+
+/* Todo anime que passa pela tela (card, destaque, detalhe...) é guardado
+   aqui, pra favoritos/histórico conseguirem exibir os dados completos
+   depois — inclusive quando o anime veio de uma API externa e não está
+   no array ANIME local. */
+const animeCache = {};
+function cacheAnime(anime){ if(anime && anime.id) animeCache[anime.id] = anime; return anime; }
+function resolveAnime(id){
+  if(animeCache[id]) return animeCache[id];
+  const local = findAnime(id);
+  if(local) return local;
+  const fav = state.favorites.find(f=>f.id===id);
+  if(fav) return fav;
+  const hist = state.history.find(h=>h.animeId===id);
+  return (hist && hist.anime) || null;
+}
+
+/* =====================================================
+   Camada de dados — troque DATA_SOURCE para "api" e aponte
+   API_BASE_URL para o backend deste repo (pasta /backend) assim
+   que ele estiver rodando/hospedado, e o site inteiro passa a usar
+   dados reais de anime (Jikan/MyAnimeList) em vez do catálogo fictício.
+   Nenhuma outra parte do código precisa mudar.
+   ===================================================== */
+const CONFIG = {
+  DATA_SOURCE: "mock", // "mock" | "api"
+  API_BASE_URL: "http://localhost:4000"
+};
+
+const DataSource = {
+  async top(){
+    if(CONFIG.DATA_SOURCE === "api"){
+      const r = await fetch(`${CONFIG.API_BASE_URL}/api/top`);
+      if(!r.ok) throw new Error("Falha ao buscar 'Em alta'");
+      return (await r.json()).results;
+    }
+    return [...ANIME].sort((a,b)=>b.rating-a.rating).slice(0,8);
+  },
+  async seasonal(){
+    if(CONFIG.DATA_SOURCE === "api"){
+      const r = await fetch(`${CONFIG.API_BASE_URL}/api/seasonal`);
+      if(!r.ok) throw new Error("Falha ao buscar lançamentos");
+      return (await r.json()).results;
+    }
+    return ANIME.filter(a=>a.status==="em exibição");
+  },
+  async recommended(){
+    if(CONFIG.DATA_SOURCE === "api"){
+      const r = await fetch(`${CONFIG.API_BASE_URL}/api/search?page=2`);
+      if(!r.ok) return [];
+      return (await r.json()).results.slice(0,8);
+    }
+    return [...ANIME].slice().reverse().slice(0,8);
+  },
+  async search(filters){
+    if(CONFIG.DATA_SOURCE === "api"){
+      const params = new URLSearchParams();
+      if(filters.q) params.set("q", filters.q);
+      if(filters.genre && filters.genre!=="Todos") params.set("genre", filters.genre);
+      if(filters.status && filters.status!=="Todos") params.set("status", filters.status);
+      const r = await fetch(`${CONFIG.API_BASE_URL}/api/search?${params.toString()}`);
+      if(!r.ok) throw new Error("Falha na busca");
+      return (await r.json()).results;
+    }
+    let list = ANIME.filter(a=>{
+      if(filters.genre!=="Todos" && !a.genres.includes(filters.genre)) return false;
+      if(filters.status!=="Todos" && a.status!==filters.status) return false;
+      if(filters.q && !(a.title.toLowerCase().includes(filters.q.toLowerCase()) || a.alt.toLowerCase().includes(filters.q.toLowerCase()))) return false;
+      return true;
+    });
+    if(filters.sort==="popularidade") list.sort((a,b)=>b.rating-a.rating);
+    if(filters.sort==="ano") list.sort((a,b)=>b.year-a.year);
+    if(filters.sort==="az") list.sort((a,b)=>a.title.localeCompare(b.title));
+    return list;
+  },
+  async byId(id){
+    if(CONFIG.DATA_SOURCE === "api"){
+      const r = await fetch(`${CONFIG.API_BASE_URL}/api/anime/${id}`);
+      if(!r.ok) return null;
+      return (await r.json()).result;
+    }
+    return findAnime(id) || null;
+  },
+  async episodes(anime){
+    const fallback = () => Array.from({length: Math.max(anime.eps||0,1)}, (_,i)=>({numero:i+1, titulo:null}));
+    if(CONFIG.DATA_SOURCE === "api"){
+      try{
+        const r = await fetch(`${CONFIG.API_BASE_URL}/api/anime/${anime.id}/episodes`);
+        if(!r.ok) return fallback();
+        const data = await r.json();
+        return (data.episodes && data.episodes.length) ? data.episodes : fallback();
+      }catch(e){ return fallback(); }
+    }
+    return fallback();
+  }
+};
+
 const store = {
   get(key, fallback){ try{ const v = localStorage.getItem("kuroshi:"+key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; } },
   set(key, val){ try{ localStorage.setItem("kuroshi:"+key, JSON.stringify(val)); }catch(e){} }
+};
+
+/* Cadastro/login "de verdade" no sentido de validar e-mail/senha contra
+   contas já criadas — mas tudo fica salvo no localStorage do navegador,
+   sem servidor de autenticação por trás. Serve pra demonstrar o fluxo;
+   trocar por autenticação real (JWT + banco de dados) é o próximo passo
+   listado no README do repositório. */
+const usersStore = {
+  all(){ return store.get("users", []); },
+  save(list){ store.set("users", list); },
+  findByEmail(email){ return this.all().find(u=>u.email.toLowerCase()===String(email).toLowerCase()); },
+  create(user){ const list = this.all(); list.push(user); this.save(list); }
 };
 
 let state = {
@@ -356,18 +472,31 @@ function toast(msg){
   el._t = setTimeout(()=>el.classList.remove("show"), 2200);
 }
 
+function snapshotAnime(anime){
+  return { id:anime.id, title:anime.title, alt:anime.alt, genres:anime.genres, year:anime.year,
+    rating:anime.rating, status:anime.status, studio:anime.studio, eps:anime.eps,
+    synopsis:anime.synopsis, cover:anime.cover, banner:anime.banner };
+}
+
 function toggleFavorite(id){
-  const i = state.favorites.indexOf(id);
+  const i = state.favorites.findIndex(f=>f.id===id);
   if(i>-1){ state.favorites.splice(i,1); toast("Removido dos favoritos"); }
-  else { state.favorites.push(id); toast("Adicionado aos favoritos"); }
+  else {
+    const anime = resolveAnime(id);
+    if(!anime) return;
+    state.favorites.push(snapshotAnime(anime));
+    toast("Adicionado aos favoritos");
+  }
   saveState(); render();
 }
-function isFavorite(id){ return state.favorites.includes(id); }
+function isFavorite(id){ return state.favorites.some(f=>f.id===id); }
 
-function recordProgress(animeId, ep, progress){
+function recordProgress(anime, ep, progress){
+  const animeId = anime.id;
   let entry = state.history.find(h=>h.animeId===animeId);
-  if(!entry){ entry = {animeId, ep, progress}; state.history.unshift(entry); }
-  else { entry.ep = ep; entry.progress = progress; state.history = [entry, ...state.history.filter(h=>h!==entry)]; }
+  const snap = snapshotAnime(anime);
+  if(!entry){ entry = {animeId, ep, progress, anime:snap}; state.history.unshift(entry); }
+  else { entry.ep = ep; entry.progress = progress; entry.anime = snap; state.history = [entry, ...state.history.filter(h=>h!==entry)]; }
   state.history = state.history.slice(0,20);
   saveState();
 }
@@ -398,16 +527,27 @@ function starsRow(rating){
   return `<div class="stars">${out}</div>`;
 }
 
+function posterMedia(anime){
+  if(anime.cover){
+    return `<img src="${anime.cover}" alt="${anime.title}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;">`;
+  }
+  return emblemSvg(anime, seedFromId(anime.id)*3);
+}
+
 function card(anime){
+  cacheAnime(anime);
+  const ratingTxt = anime.rating ? anime.rating.toFixed(1) : "–";
+  const epsTxt = anime.eps ? anime.eps : "?";
+  const subTxt = (anime.genres && anime.genres.length) ? anime.genres.join(" / ") : (anime.year || "");
   return `<a class="card" href="#" onclick="go('detail',{id:'${anime.id}'});return false;">
     <div class="poster">
-      <div class="base">${emblemSvg(anime, animeIndex(anime.id)*3)}</div>
-      <div class="rating">${ICO.starFull.replace('viewBox="0 0 24 24"','width="9" height="9" viewBox="0 0 24 24"')}${anime.rating.toFixed(1)}</div>
-      <div class="num">${anime.eps} eps</div>
+      <div class="base">${posterMedia(anime)}</div>
+      <div class="rating">${ICO.starFull.replace('viewBox="0 0 24 24"','width="9" height="9" viewBox="0 0 24 24"')}${ratingTxt}</div>
+      <div class="num">${epsTxt} eps</div>
       <div class="play-ov">${ICO.playOutline}</div>
     </div>
     <div class="card-title">${anime.title}</div>
-    <div class="card-sub">${anime.genres.join(" / ")}</div>
+    <div class="card-sub">${subTxt}</div>
   </a>`;
 }
 
@@ -457,20 +597,28 @@ function galleryThumbs(anime){
   </div>`;
 }
 
+function featureMedia(anime){
+  const src = anime.banner || anime.cover;
+  if(src) return `<img src="${src}" alt="${anime.title}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;">`;
+  return emblemSvg(anime, seedFromId(anime.id)*7);
+}
+
 function featureBlock(anime, opts){
   opts = opts || {};
+  cacheAnime(anime);
   const fav = isFavorite(anime.id);
   const hist = state.history.find(h=>h.animeId===anime.id);
+  const genre = (anime.genres && anime.genres[0]) || "Anime";
   return `<section class="feature">
     <div class="feature-art">
-      ${emblemSvg(anime, animeIndex(anime.id)*7)}
-      <div class="index-counter"><span class="cur">${String(animeIndex(anime.id)).padStart(2,'0')}</span><span class="tot">/${ANIME.length}</span></div>
+      ${featureMedia(anime)}
+      ${opts.indexLabel ? `<div class="index-counter"><span class="cur">${opts.indexLabel.cur}</span><span class="tot">${opts.indexLabel.tot}</span></div>` : ""}
     </div>
     <div class="feature-content">
       <div class="fc-dots">•••</div>
       <div class="fc-tagrow">
-        <span class="fc-tag">#${animeIndex(anime.id)} ${anime.genres[0]}</span>
-        ${starsRow(anime.rating)}
+        <span class="fc-tag">${opts.rankPrefix ? `#${opts.rankPrefix} ` : ""}${genre}</span>
+        ${starsRow(anime.rating||0)}
       </div>
       <h1 class="fc-title">${anime.title}</h1>
       <div class="fc-actions">
@@ -487,15 +635,22 @@ function featureBlock(anime, opts){
   </section>`;
 }
 
-function viewHome(){
-  const featured = ANIME[3];
-  const emAlta = [...ANIME].sort((a,b)=>b.rating-a.rating).slice(0,8);
-  const lancamentos = ANIME.filter(a=>a.status==="em exibição");
-  const continuar = state.history.map(h=>findAnime(h.animeId)).filter(Boolean);
-  const recomendados = [...ANIME].slice().reverse().slice(0,8);
+async function viewHome(){
+  const [emAlta, lancamentos, recomendados] = await Promise.all([
+    DataSource.top(), DataSource.seasonal(), DataSource.recommended()
+  ]);
+  const featured = CONFIG.DATA_SOURCE==="mock" ? ANIME[3] : (emAlta[0] || lancamentos[0] || recomendados[0]);
+  const continuar = state.history.map(h=>resolveAnime(h.animeId)).filter(Boolean);
+
+  const indexLabel = CONFIG.DATA_SOURCE==="mock" ? {cur:String(animeIndex(featured.id)).padStart(2,'0'), tot:"/"+ANIME.length} : null;
+  const rankPrefix = CONFIG.DATA_SOURCE==="mock" ? animeIndex(featured.id) : null;
+
+  if(!featured){
+    return `<div class="page-pad"><div class="empty-state"><h3>Nenhum anime encontrado</h3><p>Verifique a conexão com o backend em ${CONFIG.API_BASE_URL}.</p></div></div>`;
+  }
 
   return `
-  ${featureBlock(featured, {showSynopsis:true})}
+  ${featureBlock(featured, {showSynopsis:true, indexLabel, rankPrefix})}
   ${continuar.length ? rail("Continuar assistindo", continuar) : ""}
   ${rail("Em alta", emAlta, "catalog")}
   ${rail("Lançamentos", lancamentos, "catalog")}
@@ -503,17 +658,9 @@ function viewHome(){
   <div style="height:40px"></div>`;
 }
 
-function viewCatalog(){
+async function viewCatalog(){
   const f = state.catalogFilters;
-  let list = ANIME.filter(a=>{
-    if(f.genre!=="Todos" && !a.genres.includes(f.genre)) return false;
-    if(f.status!=="Todos" && a.status!==f.status) return false;
-    if(f.q && !(a.title.toLowerCase().includes(f.q.toLowerCase()) || a.alt.toLowerCase().includes(f.q.toLowerCase()))) return false;
-    return true;
-  });
-  if(f.sort==="popularidade") list.sort((a,b)=>b.rating-a.rating);
-  if(f.sort==="ano") list.sort((a,b)=>b.year-a.year);
-  if(f.sort==="az") list.sort((a,b)=>a.title.localeCompare(b.title));
+  const list = await DataSource.search(f);
 
   return `<div class="page-pad">
     <div class="catalog-head"><h1>Catálogo</h1><p>${list.length} título${list.length===1?"":"s"} encontrado${list.length===1?"":"s"}</p></div>
@@ -534,23 +681,27 @@ function viewCatalog(){
   </div>`;
 }
 
-function viewDetail(params){
-  const a = findAnime(params.id);
-  if(!a) return `<div class="page-pad"><p>Anime não encontrado.</p></div>`;
-  const eps = Array.from({length:a.eps}, (_,i)=>i+1);
+async function viewDetail(params){
+  const a = await DataSource.byId(params.id);
+  if(!a) return `<div class="page-pad"><div class="empty-state"><h3>Anime não encontrado</h3><p>Ele pode ter sido removido ou o backend está fora do ar.</p></div></div>`;
+  cacheAnime(a);
+  const episodes = await DataSource.episodes(a);
   const hist = state.history.find(h=>h.animeId===a.id);
+  const indexLabel = CONFIG.DATA_SOURCE==="mock" ? {cur:String(animeIndex(a.id)).padStart(2,'0'), tot:"/"+ANIME.length} : null;
+  const rankPrefix = CONFIG.DATA_SOURCE==="mock" ? animeIndex(a.id) : null;
 
   return `
-  ${featureBlock(a, {showSynopsis:true})}
+  ${featureBlock(a, {showSynopsis:true, indexLabel, rankPrefix})}
   <div class="section-pad" style="padding-top:44px;">
     <h2 style="font-size:17px;margin-bottom:16px;letter-spacing:.02em;">Episódios</h2>
     <div class="ep-list">
-      ${eps.map(n=>{
+      ${episodes.map(epObj=>{
+        const n = epObj.numero;
         const isCurrent = hist && hist.ep===n;
         const progress = isCurrent ? Math.round(hist.progress*100) : (hist && n<hist.ep ? 100 : 0);
         return `<a href="#" class="ep-row" onclick="go('player',{id:'${a.id}',ep:${n}});return false;">
           <div class="ep-num">${String(n).padStart(2,'0')}</div>
-          <div class="ep-info"><b>Episódio ${n}</b><span>~24 min · ${a.studio}</span>
+          <div class="ep-info"><b>${epObj.titulo || ("Episódio "+n)}</b><span>~24 min · ${a.studio||""}</span>
             ${progress>0 ? `<div class="ep-progress-bar"><i style="width:${progress}%"></i></div>` : ""}
           </div>
           <div class="icon-round">${ICO.play}</div>
@@ -561,11 +712,13 @@ function viewDetail(params){
 }
 
 let playerTimer = null;
-function viewPlayer(params){
-  const a = findAnime(params.id);
-  if(!a) return `<div class="page-pad"><p>Anime não encontrado.</p></div>`;
-  const ep = Math.min(Math.max(1, params.ep||1), a.eps);
-  const tone = GENRE_TONE[a.genres[0]] || "#444";
+async function viewPlayer(params){
+  const a = await DataSource.byId(params.id);
+  if(!a) return `<div class="page-pad"><div class="empty-state"><h3>Anime não encontrado</h3><p>Ele pode ter sido removido ou o backend está fora do ar.</p></div></div>`;
+  cacheAnime(a);
+  const totalEps = Math.max(1, a.eps || 1);
+  const ep = Math.min(Math.max(1, params.ep||1), totalEps);
+  const tone = GENRE_TONE[(a.genres&&a.genres[0])] || "#444";
   const hist = state.history.find(h=>h.animeId===a.id);
   const startProgress = (hist && hist.ep===ep) ? hist.progress : 0;
 
@@ -600,7 +753,7 @@ function viewPlayer(params){
       </div>
       <div class="below-player">
         <h1 style="font-size:21px;margin-bottom:6px;">${a.title}</h1>
-        <p style="color:var(--ink-faint);font-size:12.5px;margin-bottom:16px;">Episódio ${ep} de ${a.eps} · ${a.genres.join(" / ")}</p>
+        <p style="color:var(--ink-faint);font-size:12.5px;margin-bottom:16px;">Episódio ${ep} de ${totalEps} · ${(a.genres||[]).join(" / ")}</p>
         <p style="color:var(--ink-dim);font-size:14px;line-height:1.6;max-width:700px;">${a.synopsis}</p>
         <div style="margin-top:18px;display:flex;gap:12px;">
           <button class="btn btn-outline btn-sm" onclick="toggleFavorite('${a.id}')">${ICO.heart(isFavorite(a.id))} ${isFavorite(a.id)?"Nos favoritos":"Favoritar"}</button>
@@ -610,7 +763,7 @@ function viewPlayer(params){
     </div>
     <div class="sidebar-eps">
       <h3>Episódios — ${a.title}</h3>
-      ${Array.from({length:a.eps},(_,i)=>i+1).map(n=>`
+      ${Array.from({length:totalEps},(_,i)=>i+1).map(n=>`
         <a href="#" class="side-ep ${n===ep?'active':''}" onclick="go('player',{id:'${a.id}',ep:${n}});return false;">
           <div class="thumb">${sceneSvg(a, n*17)}</div>
           <div><b>Episódio ${n}</b><span>${n===ep?"Assistindo agora":"~24 min"}</span></div>
@@ -631,7 +784,7 @@ function initPlayer(anime, ep, startProgress){
     const txt = document.getElementById("timeTxt");
     if(fill) fill.style.width = (window._player.seconds/window._player.totalSeconds*100)+"%";
     if(txt) txt.textContent = `${fmt(window._player.seconds)} / ${fmt(window._player.totalSeconds)}`;
-    recordProgress(anime.id, ep, window._player.seconds/window._player.totalSeconds);
+    recordProgress(anime, ep, window._player.seconds/window._player.totalSeconds);
   }
   updateUI();
 
@@ -665,12 +818,14 @@ function playerSeek(e){
 }
 function playerSkip(dir){
   const a = window._player.anime, ep = window._player.ep;
-  go('player', {id:a.id, ep: Math.min(a.eps, Math.max(1, ep+dir))});
+  const totalEps = Math.max(1, a.eps || 1);
+  go('player', {id:a.id, ep: Math.min(totalEps, Math.max(1, ep+dir))});
 }
 let autoplayTimer = null;
 function triggerNextEpisode(){
   const a = window._player.anime, ep = window._player.ep;
-  if(ep >= a.eps) return;
+  const totalEps = Math.max(1, a.eps || 1);
+  if(ep >= totalEps) return;
   const toastEl = document.getElementById("nextToast");
   if(toastEl) toastEl.classList.add("show");
   autoplayTimer = setTimeout(()=>{ go('player',{id:a.id, ep:ep+1}); }, 6000);
@@ -687,8 +842,8 @@ function viewProfile(){
     <div style="margin-top:16px"><button class="btn btn-solid" onclick="go('login')">Entrar</button></div></div></div>`;
   }
   const tab = state.params.tab || "historico";
-  const histItems = state.history.map(h=>({...h, anime:findAnime(h.animeId)})).filter(h=>h.anime);
-  const favItems = state.favorites.map(findAnime).filter(Boolean);
+  const histItems = state.history.map(h=>({...h, anime:resolveAnime(h.animeId)})).filter(h=>h.anime);
+  const favItems = state.favorites;
 
   function tabBtn(id,label){ return `<a href="#" class="tab ${tab===id?'active':''}" onclick="go('profile',{tab:'${id}'});return false;">${label}</a>`; }
 
@@ -722,36 +877,86 @@ function viewAuth(){
         ${mode==="cadastro" ? `<div class="field"><label>Nome</label><input required name="name" type="text" placeholder="Seu nome"></div>` : ""}
         <div class="field"><label>E-mail</label><input required name="email" type="email" placeholder="voce@email.com"></div>
         <div class="field"><label>Senha</label><input required name="password" type="password" placeholder="••••••••" minlength="4"></div>
+        <div id="authError" style="display:none;color:var(--accent);font-size:12.5px;font-weight:700;margin:-6px 0 14px;"></div>
         <button class="btn btn-solid auth-submit" type="submit">${mode==="login"?"Entrar":"Criar conta"}</button>
       </form>
       <div class="auth-alt">ou continue com</div>
       <button class="btn social-btn" onclick="doSocialLogin()">Continuar com Google</button>
       <p class="switch-line">${mode==="login" ? `Não tem conta? <a href="#" onclick="go('login',{mode:'cadastro'});return false;">Cadastre-se</a>` : `Já tem conta? <a href="#" onclick="go('login',{mode:'login'});return false;">Entrar</a>`}</p>
+      <p style="text-align:center;font-size:10.5px;color:var(--ink-faint);margin-top:16px;">Conta salva apenas neste navegador — projeto de portfólio, sem servidor de autenticação real.</p>
   </div></div>`;
+}
+function showAuthError(msg){
+  const el = document.getElementById("authError");
+  if(el){ el.textContent = msg; el.style.display = "block"; }
+  else toast(msg);
 }
 function doAuthSubmit(e, mode){
   e.preventDefault();
   const f = new FormData(e.target);
-  const name = f.get("name") || (f.get("email")||"").split("@")[0] || "Usuário";
-  state.user = { name, email: f.get("email") };
-  saveState(); toast(mode==="login" ? "Login realizado" : "Conta criada"); go("home");
+  const email = (f.get("email")||"").trim();
+  const password = f.get("password")||"";
+  const name = (f.get("name")||"").trim();
+
+  if(mode==="cadastro"){
+    if(usersStore.findByEmail(email)){
+      showAuthError("Já existe uma conta com esse e-mail. Tente entrar.");
+      return false;
+    }
+    usersStore.create({ name: name || email.split("@")[0], email, password });
+    state.user = { name: name || email.split("@")[0], email };
+    saveState(); toast("Conta criada"); go("home");
+    return false;
+  }
+
+  // login
+  const found = usersStore.findByEmail(email);
+  if(!found){
+    showAuthError("Não achamos essa conta. Que tal se cadastrar?");
+    return false;
+  }
+  if(found.password !== password){
+    showAuthError("Senha incorreta.");
+    return false;
+  }
+  state.user = { name: found.name, email: found.email };
+  saveState(); toast("Login realizado"); go("home");
   return false;
 }
-function doSocialLogin(){ state.user = { name:"Convidado Google", email:"convidado@gmail.com" }; saveState(); toast("Login com Google realizado"); go("home"); }
+function doSocialLogin(){
+  const email = "convidado@gmail.com";
+  if(!usersStore.findByEmail(email)) usersStore.create({ name:"Convidado Google", email, password:null });
+  state.user = { name:"Convidado Google", email };
+  saveState(); toast("Login com Google realizado"); go("home");
+}
 function doLogout(){ state.user = null; saveState(); toast("Você saiu da conta"); go("home"); }
 
-function render(){
+let renderToken = 0;
+async function render(){
   clearInterval(playerTimer);
-  const v = state.view;
-  let body = "";
-  if(v==="home") body = viewHome();
-  else if(v==="catalog") body = viewCatalog();
-  else if(v==="detail") body = viewDetail(state.params);
-  else if(v==="player") body = viewPlayer(state.params);
-  else if(v==="profile") body = viewProfile();
-  else if(v==="login") body = viewAuth();
-  else body = viewHome();
+  const myToken = ++renderToken;
+  let v = state.view;
 
+  // já logado não precisa ver a tela de login/cadastro
+  if(v==="login" && state.user){ v = "profile"; state.view = "profile"; }
+
+  document.getElementById("app").innerHTML = `${topNav(v)}<main><div class="page-pad"><div class="empty-state"><h3>Carregando…</h3></div></div></main>`;
+
+  let body = "";
+  try{
+    if(v==="home") body = await viewHome();
+    else if(v==="catalog") body = await viewCatalog();
+    else if(v==="detail") body = await viewDetail(state.params);
+    else if(v==="player") body = await viewPlayer(state.params);
+    else if(v==="profile") body = viewProfile();
+    else if(v==="login") body = viewAuth();
+    else body = await viewHome();
+  }catch(err){
+    console.error(err);
+    body = `<div class="page-pad"><div class="empty-state"><h3>Não deu pra carregar os dados</h3><p>${CONFIG.DATA_SOURCE==="api" ? `Verifique se o backend está rodando em ${CONFIG.API_BASE_URL}.` : "Tente novamente em instantes."}</p></div></div>`;
+  }
+
+  if(myToken !== renderToken) return; // uma navegação mais nova já aconteceu
   document.getElementById("app").innerHTML = `${topNav(v)}<main>${body}</main>${v!=="player" ? siteFooter() : ""}`;
 }
 
