@@ -1,0 +1,19 @@
+# Blueprint do Render (https://render.com) — deploy em um clique do backend.
+# Em Render: New + -> Blueprint -> aponte pro seu fork/repositório do Kuroshi.
+# Isso NÃO é necessário para o front-end (GitHub Pages já cobre isso sozinho
+# no modo DATA_SOURCE: "jikan") — só use se quiser rodar o backend próprio
+# (por exemplo, para usar o provedor AniList ou sua própria camada extra).
+services:
+  - type: web
+    name: kuroshi-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: PROVIDER
+        value: jikan
+      - key: NODE_VERSION
+        value: 20
